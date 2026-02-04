@@ -23,16 +23,15 @@ export function UploadZone() {
     setProgress(10);
 
     try {
-      // 1. Upload to file.io
+      // 1. Upload to our backend proxy instead of directly to file.io to avoid CORS
       const formData = new FormData();
       formData.append("file", file);
       
-      // Simulate progress for better UX since fetch doesn't support progress events easily
       const progressInterval = setInterval(() => {
         setProgress((prev) => (prev < 90 ? prev + 10 : prev));
       }, 300);
 
-      const response = await fetch("https://file.io/?expires=2h", {
+      const response = await fetch("/api/upload", {
         method: "POST",
         body: formData,
       });
@@ -41,28 +40,13 @@ export function UploadZone() {
       setProgress(100);
 
       if (!response.ok) {
-        throw new Error("Failed to upload to file.io");
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to upload file");
       }
 
       const data = await response.json();
       
-      if (!data.success) {
-        throw new Error("File.io upload failed");
-      }
-
-      // 2. Save metadata to our backend
-      // Default to 2 hours from now if file.io doesn't provide a clear date string we can parse easily
-      const expiresAt = addHours(new Date(), 2);
-      
-      const fileData = await createFile.mutateAsync({
-        filename: file.name,
-        mimeType: file.type || "application/octet-stream",
-        size: file.size,
-        fileIoLink: data.link,
-        fileIoKey: data.key,
-        expiresAt: expiresAt.toISOString(),
-      });
-
+      // The backend will return the file record directly after creating it in DB
       setUploadStatus("success");
       confetti({
         particleCount: 100,
@@ -72,11 +56,11 @@ export function UploadZone() {
 
       // Redirect after short delay
       setTimeout(() => {
-        setLocation(`/share/${fileData.publicId}`);
+        setLocation(`/share/${data.publicId}`);
       }, 1500);
 
     } catch (err: any) {
-      console.error(err);
+      console.error("Upload error:", err);
       setUploadStatus("error");
       setErrorMessage(err.message || "Something went wrong during upload");
     }

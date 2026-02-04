@@ -5,6 +5,12 @@ import { api } from "@shared/routes";
 import { z } from "zod";
 import { Server as SocketIOServer } from "socket.io";
 import { insertFileSchema } from "@shared/schema";
+import multer from "multer";
+import fetch from "node-fetch";
+import FormData from "form-data";
+import { addHours } from "date-fns";
+
+const upload = multer({ storage: multer.memoryStorage() });
 
 export async function registerRoutes(
   httpServer: Server,
@@ -14,22 +20,16 @@ export async function registerRoutes(
   // === Socket.io Setup ===
   const io = new SocketIOServer(httpServer, {
     cors: {
-      origin: "*", // Allow all origins for simplicity in this demo
+      origin: "*",
       methods: ["GET", "POST"]
     }
   });
 
   io.on("connection", (socket) => {
-    console.log("New client connected", socket.id);
-
     socket.on("join", async ({ publicId, senderName }) => {
-      // Validate room exists
       const file = await storage.getFileByPublicId(publicId);
       if (file) {
         socket.join(publicId);
-        console.log(`${senderName} joined room ${publicId}`);
-        
-        // Send history
         const history = await storage.getMessages(file.id);
         socket.emit("history", history);
       } else {
@@ -45,21 +45,58 @@ export async function registerRoutes(
           senderName,
           content
         });
-        // Broadcast to room
         io.to(publicId).emit("message", message);
       }
-    });
-
-    socket.on("disconnect", () => {
-      console.log("Client disconnected");
     });
   });
 
   // === API Routes ===
 
+  app.post("/api/upload", upload.single("file"), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const form = new FormData();
+      form.append("file", req.file.buffer, {
+        filename: req.file.originalname,
+        contentType: req.file.mimetype,
+      });
+
+      const response = await fetch("https://file.io/?expires=2h", {
+        method: "POST",
+        body: form,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to upload to file.io");
+      }
+
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.message || "File.io upload failed");
+      }
+
+      const expiresAt = addHours(new Date(), 2);
+      const file = await storage.createFile({
+        filename: req.file.originalname,
+        mimeType: req.file.mimetype,
+        size: req.file.size,
+        fileIoLink: data.link,
+        fileIoKey: data.key,
+        expiresAt,
+      });
+
+      res.status(201).json(file);
+    } catch (err: any) {
+      console.error("Upload proxy error:", err);
+      res.status(500).json({ message: err.message || "Internal Server Error" });
+    }
+  });
+
   app.post(api.files.create.path, async (req, res) => {
     try {
-      // Clean input: remove id/publicId/createdAt if present
       const cleanBody = { ...req.body };
       delete cleanBody.id;
       delete cleanBody.publicId;
@@ -75,15 +112,13 @@ export async function registerRoutes(
           field: err.errors[0].path.join('.'),
         });
       } else {
-        console.error("Create file error:", err);
         res.status(500).json({ message: "Internal Server Error" });
       }
     }
   });
 
   app.get(api.files.getByPublicId.path, async (req, res) => {
-    const publicId = req.params.publicId;
-    const file = await storage.getFileByPublicId(publicId);
+    const file = await storage.getFileByPublicId(req.params.publicId);
     if (!file) {
       return res.status(404).json({ message: 'File not found' });
     }
@@ -91,8 +126,7 @@ export async function registerRoutes(
   });
 
   app.get(api.messages.list.path, async (req, res) => {
-    const fileId = Number(req.params.fileId);
-    const messages = await storage.getMessages(fileId);
+    const messages = await storage.getMessages(Number(req.params.fileId));
     res.json(messages);
   });
 
