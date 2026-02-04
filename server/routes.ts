@@ -67,6 +67,7 @@ export async function registerRoutes(
       const response = await fetch("https://file.io/?expires=2h", {
         method: "POST",
         body: form,
+        headers: form.getHeaders(),
       });
 
       if (!response.ok) {
