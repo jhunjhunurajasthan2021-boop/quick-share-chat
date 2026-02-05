@@ -6,7 +6,7 @@ import { z } from "zod";
 import { Server as SocketIOServer } from "socket.io";
 import { insertFileSchema } from "@shared/schema";
 import multer from "multer";
-import fetch from "node-fetch";
+import axios from "axios";
 import FormData from "form-data";
 import { addHours } from "date-fns";
 
@@ -59,22 +59,26 @@ export async function registerRoutes(
       }
 
       const form = new FormData();
+      // Ensure we use the buffer directly and set a proper filename
       form.append("file", req.file.buffer, {
         filename: req.file.originalname,
         contentType: req.file.mimetype,
+        knownLength: req.file.size
       });
 
-      const response = await fetch("https://file.io/?expires=2h", {
-        method: "POST",
-        body: form,
-        headers: form.getHeaders(),
+      console.log(`Proxying upload to file.io: ${req.file.originalname} (${req.file.size} bytes)`);
+      
+      const response = await axios.post("https://file.io/?expires=2h", form, {
+        headers: {
+          ...form.getHeaders(),
+        },
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to upload to file.io");
-      }
+      const data = response.data;
+      console.log("File.io response:", data);
 
-      const data = await response.json();
       if (!data.success) {
         throw new Error(data.message || "File.io upload failed");
       }
@@ -91,8 +95,9 @@ export async function registerRoutes(
 
       res.status(201).json(file);
     } catch (err: any) {
-      console.error("Upload proxy error:", err);
-      res.status(500).json({ message: err.message || "Internal Server Error" });
+      console.error("Upload proxy error:", err.response?.data || err.message);
+      const errorMessage = err.response?.data?.message || err.message || "Internal Server Error";
+      res.status(500).json({ message: errorMessage });
     }
   });
 
