@@ -4,11 +4,13 @@ import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import { Server as SocketIOServer } from "socket.io";
-import { insertFileSchema } from "@shared/schema";
+import { insertFileSchema, files } from "@shared/schema";
 import multer from "multer";
 import axios from "axios";
 import FormData from "form-data";
 import { addHours } from "date-fns";
+import { eq } from "drizzle-orm";
+import { db } from "./db";
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -58,47 +60,45 @@ export async function registerRoutes(
         return res.status(400).json({ message: "No file uploaded" });
       }
 
-      const form = new FormData();
-      // Ensure we use the buffer directly and set a proper filename
-      form.append("file", req.file.buffer, {
-        filename: req.file.originalname,
-        contentType: req.file.mimetype,
-        knownLength: req.file.size
-      });
-
-      console.log(`Proxying upload to file.io: ${req.file.originalname} (${req.file.size} bytes)`);
+      console.log(`Starting direct-to-DB storage for: ${req.file.originalname}`);
       
-      const response = await axios.post("https://file.io/?expires=2h", form, {
-        headers: {
-          ...form.getHeaders(),
-        },
-        maxContentLength: Infinity,
-        maxBodyLength: Infinity,
-      });
-
-      const data = response.data;
-      console.log("File.io response:", data);
-
-      if (!data.success) {
-        throw new Error(data.message || "File.io upload failed");
-      }
-
       const expiresAt = addHours(new Date(), 2);
       const file = await storage.createFile({
         filename: req.file.originalname,
         mimeType: req.file.mimetype,
         size: req.file.size,
-        fileIoLink: data.link,
-        fileIoKey: data.key,
+        fileIoLink: "pending", // Update after we have the publicId
+        fileIoKey: "local-key",
         expiresAt,
       });
 
-      res.status(201).json(file);
+      // Update the link to use the actual publicId
+      const [updatedFile] = await db.update(files)
+        .set({ fileIoLink: `/api/download/${file.publicId}` })
+        .where(eq(files.id, file.id))
+        .returning();
+      
+      // Since we can't rely on file.io right now, let's store the buffer in memory for 2 hours
+      (storage as any).fileBuffers = (storage as any).fileBuffers || new Map();
+      (storage as any).fileBuffers.set(updatedFile.publicId, req.file.buffer);
+
+      res.status(201).json(updatedFile);
     } catch (err: any) {
-      console.error("Upload proxy error:", err.response?.data || err.message);
-      const errorMessage = err.response?.data?.message || err.message || "Internal Server Error";
-      res.status(500).json({ message: errorMessage });
+      console.error("Upload error:", err.message);
+      res.status(500).json({ message: err.message || "Internal Server Error" });
     }
+  });
+
+  app.get("/api/download/:publicId", async (req, res) => {
+    const file = await storage.getFileByPublicId(req.params.publicId);
+    if (!file) return res.status(404).send("Not found");
+    
+    const buffer = (storage as any).fileBuffers?.get(req.params.publicId);
+    if (!buffer) return res.status(404).send("File expired or not found");
+
+    res.setHeader("Content-Type", file.mimeType);
+    res.setHeader("Content-Disposition", `attachment; filename="${file.filename}"`);
+    res.send(buffer);
   });
 
   app.post(api.files.create.path, async (req, res) => {

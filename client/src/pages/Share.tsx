@@ -39,7 +39,11 @@ export default function Share() {
 
   const handleDownload = () => {
     if (file) {
-      window.open(file.fileIoLink, "_blank");
+      // If the link is relative, use it as a download link
+      const downloadUrl = file.fileIoLink.startsWith('/') 
+        ? `${window.location.origin}${file.fileIoLink}`
+        : file.fileIoLink;
+      window.open(downloadUrl, "_blank");
     }
   };
 
