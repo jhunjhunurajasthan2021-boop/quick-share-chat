@@ -28,18 +28,25 @@ export async function registerRoutes(
   });
 
   io.on("connection", (socket) => {
+    console.log("New client connected", socket.id);
+
     socket.on("join", async ({ publicId, senderName }) => {
+      console.log(`Join request for room: ${publicId} from ${senderName}`);
       const file = await storage.getFileByPublicId(publicId);
       if (file) {
         socket.join(publicId);
+        console.log(`Socket ${socket.id} joined room ${publicId}`);
+        
         const history = await storage.getMessages(file.id);
         socket.emit("history", history);
       } else {
+        console.log(`Room ${publicId} not found for join`);
         socket.emit("error", { message: "Room not found" });
       }
     });
 
     socket.on("message", async ({ publicId, content, senderName }) => {
+      console.log(`Message in room ${publicId} from ${senderName}: ${content}`);
       const file = await storage.getFileByPublicId(publicId);
       if (file) {
         const message = await storage.createMessage({
@@ -47,8 +54,15 @@ export async function registerRoutes(
           senderName,
           content
         });
+        console.log(`Broadcasting message to room ${publicId}`);
         io.to(publicId).emit("message", message);
+      } else {
+        console.log(`Room ${publicId} not found for message`);
       }
+    });
+
+    socket.on("disconnect", (reason) => {
+      console.log("Client disconnected", socket.id, reason);
     });
   });
 

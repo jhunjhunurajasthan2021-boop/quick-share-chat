@@ -10,8 +10,8 @@ export function useChat(publicId: string, username: string) {
   useEffect(() => {
     if (!publicId) return;
 
-    // Connect to the same host as the page is served from
-    const socket = io(window.location.host);
+    // Connect using default path and proper options
+    const socket = io();
     socketRef.current = socket;
 
     socket.on("connect", () => {
