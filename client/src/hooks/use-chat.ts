@@ -44,12 +44,14 @@ export function useChat(publicId: string, username: string) {
 
   const sendMessage = useCallback((content: string) => {
     if (socketRef.current && isConnected) {
+      console.log(`Sending message to room ${publicId}: ${content}`);
       socketRef.current.emit("message", {
+        publicId, // Explicitly include the room ID
         content,
         senderName: username,
       });
     }
-  }, [isConnected, username]);
+  }, [isConnected, username, publicId]);
 
   return { messages, sendMessage, isConnected };
 }
