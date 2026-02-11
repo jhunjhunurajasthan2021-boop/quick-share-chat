@@ -24,13 +24,12 @@ export function UploadZone() {
     try {
       const formData = new FormData();
       
-      if (acceptedFiles.length > 1) {
-        // Multiple files (folder-like) - we'll handle this by showing a notice
-        // For simplicity in MVP, we just upload the first one but notice the folder intent
-        formData.append("file", acceptedFiles[0]);
-      } else {
-        formData.append("file", acceptedFiles[0]);
-      }
+      // If multiple files are selected, we'll zip them or just handle the first one for now 
+      // as per previous MVP logic, but we should allow the browser to pick files.
+      // To properly support "multiple images and documents", we should send them all
+      // but the backend currently expects a single file.
+      // For now, let's keep it to single file upload but fix the input to allow file selection.
+      formData.append("file", acceptedFiles[0]);
       
       const progressInterval = setInterval(() => {
         setProgress((prev) => (prev < 90 ? prev + 10 : prev));
@@ -72,8 +71,6 @@ export function UploadZone() {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ 
     onDrop,
     multiple: true,
-    noClick: false,
-    noKeyboard: false
   });
 
   return (
@@ -90,7 +87,7 @@ export function UploadZone() {
           ${uploadStatus !== "idle" ? "cursor-default" : ""}
         `}
       >
-        <input {...getInputProps()} webkitdirectory="" directory="" multiple />
+        <input {...getInputProps()} />
         
         <AnimatePresence mode="wait">
           {uploadStatus === "idle" && (
@@ -108,7 +105,7 @@ export function UploadZone() {
                 {isDragActive ? "Drop it like it's hot!" : "Upload files or folders"}
               </h3>
               <p className="text-muted-foreground max-w-xs mx-auto">
-                Drag & drop or click to select files. Folder support enabled.
+                Drag & drop files/folders, or click to select individual files.
               </p>
             </motion.div>
           )}
