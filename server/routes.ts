@@ -74,25 +74,23 @@ export async function registerRoutes(
         return res.status(400).json({ message: "No file uploaded" });
       }
 
-      console.log(`Starting direct-to-DB storage for: ${req.file.originalname}`);
+      console.log(`Storing upload: ${req.file.originalname} (${req.file.size} bytes)`);
       
       const expiresAt = addHours(new Date(), 2);
       const file = await storage.createFile({
         filename: req.file.originalname,
         mimeType: req.file.mimetype,
         size: req.file.size,
-        fileIoLink: "pending", // Update after we have the publicId
+        fileIoLink: "pending", 
         fileIoKey: "local-key",
         expiresAt,
       });
 
-      // Update the link to use the actual publicId
       const [updatedFile] = await db.update(files)
         .set({ fileIoLink: `/api/download/${file.publicId}` })
         .where(eq(files.id, file.id))
         .returning();
       
-      // Since we can't rely on file.io right now, let's store the buffer in memory for 2 hours
       (storage as any).fileBuffers = (storage as any).fileBuffers || new Map();
       (storage as any).fileBuffers.set(updatedFile.publicId, req.file.buffer);
 

@@ -1,16 +1,16 @@
 import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, File, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { Upload, File, CheckCircle2, AlertCircle, Loader2, FolderOpen } from "lucide-react";
 import { useCreateFile } from "@/hooks/use-files";
 import { useLocation } from "wouter";
 import confetti from "canvas-confetti";
 import { addHours } from "date-fns";
 import { Progress } from "@/components/ui/progress";
+import JSZip from "jszip";
 
 export function UploadZone() {
   const [, setLocation] = useLocation();
-  const createFile = useCreateFile();
   const [uploadStatus, setUploadStatus] = useState<"idle" | "uploading" | "success" | "error">("idle");
   const [progress, setProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState("");
@@ -23,34 +23,56 @@ export function UploadZone() {
 
     try {
       const formData = new FormData();
-      
-      // If multiple files are selected, we'll zip them or just handle the first one for now 
-      // as per previous MVP logic, but we should allow the browser to pick files.
-      // To properly support "multiple images and documents", we should send them all
-      // but the backend currently expects a single file.
-      // For now, let's keep it to single file upload but fix the input to allow file selection.
-      formData.append("file", acceptedFiles[0]);
-      
-      const progressInterval = setInterval(() => {
-        setProgress((prev) => (prev < 90 ? prev + 10 : prev));
-      }, 300);
+      let fileToUpload: Blob | File = acceptedFiles[0];
+      let fileName = acceptedFiles[0].name;
+      let mimeType = acceptedFiles[0].type || "application/octet-stream";
 
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-      
-      clearInterval(progressInterval);
-      setProgress(100);
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || "Failed to upload file");
+      if (acceptedFiles.length > 1) {
+        // Multiple files or folder - Zip them together
+        const zip = new JSZip();
+        acceptedFiles.forEach((file) => {
+          // Use webkitRelativePath if available for folder structure, else just the name
+          const path = (file as any).webkitRelativePath || file.name;
+          zip.file(path, file);
+        });
+        
+        fileToUpload = await zip.generateAsync({ type: "blob" }, (metadata) => {
+          setProgress(10 + Math.round(metadata.percent * 0.4)); // 10% to 50% for zipping
+        });
+        fileName = "bundled_files.zip";
+        mimeType = "application/zip";
       }
+      
+      formData.append("file", fileToUpload, fileName);
+      
+      const progressOffset = acceptedFiles.length > 1 ? 50 : 10;
+      const progressScale = acceptedFiles.length > 1 ? 0.5 : 0.9;
 
-      const data = await response.json();
+      const xhr = new XMLHttpRequest();
+      const uploadPromise = new Promise((resolve, reject) => {
+        xhr.upload.addEventListener("progress", (event) => {
+          if (event.lengthComputable) {
+            const percent = Math.round((event.loaded / event.total) * 100);
+            setProgress(progressOffset + Math.round(percent * progressScale));
+          }
+        });
+        xhr.addEventListener("load", () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(JSON.parse(xhr.responseText));
+          } else {
+            const error = JSON.parse(xhr.responseText || "{}");
+            reject(new Error(error.message || "Upload failed"));
+          }
+        });
+        xhr.addEventListener("error", () => reject(new Error("Network error")));
+        xhr.open("POST", "/api/upload");
+        xhr.send(formData);
+      });
+
+      const data: any = await uploadPromise;
       
       setUploadStatus("success");
+      setProgress(100);
       confetti({
         particleCount: 100,
         spread: 70,
@@ -87,6 +109,7 @@ export function UploadZone() {
           ${uploadStatus !== "idle" ? "cursor-default" : ""}
         `}
       >
+        {/* We use a hidden input that supports both files and folders */}
         <input {...getInputProps()} />
         
         <AnimatePresence mode="wait">
@@ -98,14 +121,20 @@ export function UploadZone() {
               exit={{ opacity: 0, y: -10 }}
               className="flex flex-col items-center justify-center space-y-4"
             >
-              <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-2">
-                <Upload className="w-10 h-10 text-primary" />
+              <div className="flex gap-4 mb-2">
+                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Upload className="w-8 h-8 text-primary" />
+                </div>
+                <div className="w-16 h-16 rounded-full bg-blue-500/10 flex items-center justify-center">
+                  <FolderOpen className="w-8 h-8 text-blue-500" />
+                </div>
               </div>
               <h3 className="text-2xl font-bold text-foreground font-display">
                 {isDragActive ? "Drop it like it's hot!" : "Upload files or folders"}
               </h3>
               <p className="text-muted-foreground max-w-xs mx-auto">
-                Drag & drop files/folders, or click to select individual files.
+                Drag & drop files/folders, or click to select. 
+                Supports all file types (JPG, ZIP, PDF, PSD, etc.)
               </p>
             </motion.div>
           )}
