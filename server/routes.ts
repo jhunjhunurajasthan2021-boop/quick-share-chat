@@ -14,6 +14,13 @@ import { db } from "./db";
 
 const upload = multer({ storage: multer.memoryStorage() });
 
+// === Pairing System (In-Memory) ===
+const pairingCodes = new Map<string, { socketId: string; expires: number }>();
+
+function generatePairingCode(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -29,6 +36,58 @@ export async function registerRoutes(
 
   io.on("connection", (socket) => {
     console.log("New client connected", socket.id);
+
+    // --- Pairing Logic ---
+    socket.on("generate-code", () => {
+      const code = generatePairingCode();
+      const expires = Date.now() + 10 * 60 * 1000; // 10 minutes
+      pairingCodes.set(code, { socketId: socket.id, expires });
+      
+      // Auto-cleanup after expiration
+      setTimeout(() => {
+        const entry = pairingCodes.get(code);
+        if (entry && entry.socketId === socket.id) {
+          pairingCodes.delete(code);
+        }
+      }, 10 * 60 * 1000);
+
+      socket.emit("code-generated", { code, expires });
+      console.log(`Generated pairing code ${code} for socket ${socket.id}`);
+    });
+
+    socket.on("join-pairing", ({ code }) => {
+      const entry = pairingCodes.get(code);
+      
+      if (!entry) {
+        return socket.emit("pairing-error", { message: "Invalid or expired code" });
+      }
+
+      if (entry.expires < Date.now()) {
+        pairingCodes.delete(code);
+        return socket.emit("pairing-error", { message: "Code has expired" });
+      }
+
+      const partnerSocket = io.sockets.sockets.get(entry.socketId);
+      if (!partnerSocket) {
+        pairingCodes.delete(code);
+        return socket.emit("pairing-error", { message: "Partner disconnected" });
+      }
+
+      // Create a unique room for this pair
+      const roomId = `pair-${code}`;
+      socket.join(roomId);
+      partnerSocket.join(roomId);
+
+      // Notify both parties
+      io.to(roomId).emit("paired", { roomId });
+      pairingCodes.delete(code); // Code used, remove it
+      console.log(`Sockets ${socket.id} and ${entry.socketId} paired in room ${roomId}`);
+    });
+
+    socket.on("pair-message", ({ roomId, content, senderName }) => {
+      io.to(roomId).emit("pair-message", { content, senderName, timestamp: new Date() });
+    });
+    // --- End Pairing Logic ---
 
     socket.on("join", async ({ publicId, senderName }) => {
       console.log(`Join request for room: ${publicId} from ${senderName}`);
