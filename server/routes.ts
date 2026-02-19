@@ -41,14 +41,16 @@ export async function registerRoutes(
     socket.on("generate-code", () => {
       const code = generatePairingCode();
       const expires = Date.now() + 10 * 60 * 1000; // 10 minutes
+      
+      // Join a room specifically for this code immediately
+      const pendingRoom = `pending-${code}`;
+      socket.join(pendingRoom);
+      
       pairingCodes.set(code, { socketId: socket.id, expires });
       
       // Auto-cleanup after expiration
       setTimeout(() => {
-        const entry = pairingCodes.get(code);
-        if (entry && entry.socketId === socket.id) {
-          pairingCodes.delete(code);
-        }
+        pairingCodes.delete(code);
       }, 10 * 60 * 1000);
 
       socket.emit("code-generated", { code, expires });
@@ -67,21 +69,34 @@ export async function registerRoutes(
         return socket.emit("pairing-error", { message: "Code has expired" });
       }
 
-      const partnerSocket = io.sockets.sockets.get(entry.socketId);
-      if (!partnerSocket) {
+      // Check if the creator is still in the pending room
+      const pendingRoom = `pending-${code}`;
+      const clients = io.sockets.adapter.rooms.get(pendingRoom);
+      
+      if (!clients || clients.size === 0) {
         pairingCodes.delete(code);
-        return socket.emit("pairing-error", { message: "Partner disconnected" });
+        return socket.emit("pairing-error", { message: "Partner disconnected or refreshed" });
       }
 
       // Create a unique room for this pair
       const roomId = `pair-${code}`;
+      
+      // Move everyone from pending room to the pair room
+      for (const clientId of clients) {
+        const clientSocket = io.sockets.sockets.get(clientId);
+        if (clientSocket) {
+          clientSocket.leave(pendingRoom);
+          clientSocket.join(roomId);
+        }
+      }
+      
+      // Current socket joins the pair room
       socket.join(roomId);
-      partnerSocket.join(roomId);
 
       // Notify both parties
       io.to(roomId).emit("paired", { roomId });
-      pairingCodes.delete(code); // Code used, remove it
-      console.log(`Sockets ${socket.id} and ${entry.socketId} paired in room ${roomId}`);
+      pairingCodes.delete(code); // Code used
+      console.log(`Paired devices in room ${roomId}`);
     });
 
     socket.on("pair-message", ({ roomId, content, senderName }) => {
