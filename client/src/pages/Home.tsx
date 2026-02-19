@@ -1,5 +1,7 @@
 import { UploadZone } from "@/components/UploadZone";
-import { Shield, Zap, Clock } from "lucide-react";
+import { PairingSystem } from "@/components/PairingSystem";
+import { Shield, Zap, Clock, Smartphone } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Home() {
   return (
@@ -27,16 +29,29 @@ export default function Home() {
               leave no trace.
             </span>
           </h1>
-          
-          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            Upload files up to 2GB. Links automatically self-destruct after 2 hours. 
-            No sign-up required.
-          </p>
         </div>
 
-        {/* Upload Component */}
-        <div className="w-full relative z-20">
-          <UploadZone />
+        {/* Interaction Tabs */}
+        <div className="w-full max-w-4xl relative z-20">
+          <Tabs defaultValue="upload" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 max-w-[400px] mx-auto mb-8 h-12 p-1 bg-white/50 backdrop-blur-sm border border-border rounded-full">
+              <TabsTrigger value="upload" className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                Quick Upload
+              </TabsTrigger>
+              <TabsTrigger value="pair" className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-2">
+                <Smartphone className="w-4 h-4" />
+                Pair Device
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="upload" className="mt-0">
+              <UploadZone />
+            </TabsContent>
+            
+            <TabsContent value="pair" className="mt-0">
+              <PairingSystem />
+            </TabsContent>
+          </Tabs>
         </div>
 
         {/* Features Grid */}
