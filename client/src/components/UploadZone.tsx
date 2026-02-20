@@ -9,7 +9,7 @@ import { addHours } from "date-fns";
 import { Progress } from "@/components/ui/progress";
 import JSZip from "jszip";
 
-export function UploadZone({ compact = false }: { compact?: boolean }) {
+export function UploadZone({ compact = false, onUploadComplete }: { compact?: boolean, onUploadComplete?: (data: any) => void }) {
   const [, setLocation] = useLocation();
   const [uploadStatus, setUploadStatus] = useState<"idle" | "uploading" | "success" | "error">("idle");
   const [progress, setProgress] = useState(0);
@@ -79,9 +79,14 @@ export function UploadZone({ compact = false }: { compact?: boolean }) {
         origin: { y: 0.6 }
       });
 
-      setTimeout(() => {
-        setLocation(`/share/${data.publicId}`);
-      }, 1500);
+      if (onUploadComplete) {
+        onUploadComplete(data);
+        setTimeout(() => setUploadStatus("idle"), 2000);
+      } else {
+        setTimeout(() => {
+          setLocation(`/share/${data.publicId}`);
+        }, 1500);
+      }
 
     } catch (err: any) {
       console.error("Upload error:", err);

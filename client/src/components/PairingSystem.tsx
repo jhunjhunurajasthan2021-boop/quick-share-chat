@@ -82,7 +82,13 @@ export function PairingSystem() {
               </form>
               <div className="pt-4 border-t border-dashed">
                 <p className="text-xs font-semibold text-muted-foreground mb-3 text-center uppercase tracking-wider">Quick File Share</p>
-                <UploadZone compact />
+                <UploadZone 
+                  compact 
+                  onUploadComplete={(data) => {
+                    const fileLink = `${window.location.origin}/api/download/${data.publicId}`;
+                    sendPairMessage(`Shared a file: ${data.filename}\nDownload link: ${fileLink}`);
+                  }}
+                />
               </div>
             </div>
           </div>
