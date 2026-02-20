@@ -9,7 +9,7 @@ import { addHours } from "date-fns";
 import { Progress } from "@/components/ui/progress";
 import JSZip from "jszip";
 
-export function UploadZone() {
+export function UploadZone({ compact = false }: { compact?: boolean }) {
   const [, setLocation] = useLocation();
   const [uploadStatus, setUploadStatus] = useState<"idle" | "uploading" | "success" | "error">("idle");
   const [progress, setProgress] = useState(0);
@@ -100,17 +100,18 @@ export function UploadZone() {
       <div
         {...getRootProps()}
         className={`
-          relative overflow-hidden rounded-3xl p-10 text-center cursor-pointer
+          relative overflow-hidden rounded-3xl text-center cursor-pointer
           border-2 border-dashed transition-all duration-300
+          ${compact ? "p-4" : "p-10"}
           ${isDragActive 
             ? "border-primary bg-primary/5 scale-[1.02]" 
             : "border-border hover:border-primary/50 hover:bg-white/50 bg-white/30"
           }
           ${uploadStatus !== "idle" ? "cursor-default" : ""}
         `}
+        data-testid="dropzone"
       >
-        {/* We use a hidden input that supports both files and folders */}
-        <input {...getInputProps()} />
+        <input {...getInputProps()} data-testid="input-file" />
         
         <AnimatePresence mode="wait">
           {uploadStatus === "idle" && (
@@ -119,23 +120,27 @@ export function UploadZone() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="flex flex-col items-center justify-center space-y-4"
+              className={`flex flex-col items-center justify-center ${compact ? "space-y-2" : "space-y-4"}`}
             >
-              <div className="flex gap-4 mb-2">
-                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Upload className="w-8 h-8 text-primary" />
+              <div className={`flex gap-4 ${compact ? "mb-0" : "mb-2"}`}>
+                <div className={`${compact ? "w-10 h-10" : "w-16 h-16"} rounded-full bg-primary/10 flex items-center justify-center`}>
+                  <Upload className={`${compact ? "w-5 h-5" : "w-8 h-8"} text-primary`} />
                 </div>
-                <div className="w-16 h-16 rounded-full bg-blue-500/10 flex items-center justify-center">
-                  <FolderOpen className="w-8 h-8 text-blue-500" />
-                </div>
+                {!compact && (
+                  <div className="w-16 h-16 rounded-full bg-blue-500/10 flex items-center justify-center">
+                    <FolderOpen className="w-8 h-8 text-blue-500" />
+                  </div>
+                )}
               </div>
-              <h3 className="text-2xl font-bold text-foreground font-display">
-                {isDragActive ? "Drop it like it's hot!" : "Upload files or folders"}
+              <h3 className={`${compact ? "text-base" : "text-2xl"} font-bold text-foreground font-display`}>
+                {isDragActive ? "Drop it!" : compact ? "Drop files to share" : "Upload files or folders"}
               </h3>
-              <p className="text-muted-foreground max-w-xs mx-auto">
-                Drag & drop files/folders, or click to select. 
-                Supports all file types (JPG, ZIP, PDF, PSD, etc.)
-              </p>
+              {!compact && (
+                <p className="text-muted-foreground max-w-xs mx-auto">
+                  Drag & drop files/folders, or click to select. 
+                  Supports all file types (JPG, ZIP, PDF, PSD, etc.)
+                </p>
+              )}
             </motion.div>
           )}
 

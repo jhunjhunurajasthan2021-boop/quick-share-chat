@@ -58,7 +58,7 @@ export function PairingSystem() {
               ))}
             </div>
             
-            <div className="p-4 border-t bg-white/30 space-y-4">
+            <div className="p-4 border-t bg-white/30">
               <form 
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -67,21 +67,22 @@ export function PairingSystem() {
                     setChatInput("");
                   }
                 }}
-                className="flex gap-2"
+                className="flex gap-2 mb-4"
               >
                 <Input 
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
                   placeholder="Type a message..."
                   className="rounded-full bg-white/50"
+                  data-testid="input-chat"
                 />
-                <Button type="submit" size="icon" className="rounded-full">
+                <Button type="submit" size="icon" className="rounded-full" data-testid="button-send">
                   <Send className="w-4 h-4" />
                 </Button>
               </form>
-              <div className="pt-2">
-                <p className="text-xs font-medium text-muted-foreground mb-2 text-center">Quick File Share</p>
-                <UploadZone />
+              <div className="pt-4 border-t border-dashed">
+                <p className="text-xs font-semibold text-muted-foreground mb-3 text-center uppercase tracking-wider">Quick File Share</p>
+                <UploadZone compact />
               </div>
             </div>
           </div>
