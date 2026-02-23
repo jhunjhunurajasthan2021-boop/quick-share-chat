@@ -2,12 +2,23 @@ import { UploadZone } from "@/components/UploadZone";
 import { PairingSystem } from "@/components/PairingSystem";
 import { Shield, Zap, Clock, Smartphone } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import logoImg from "@assets/ChatGPT_Image_Feb_22,_2026,_12_02_11_PM_1771820544101.png";
 
 export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50/50 to-white flex flex-col">
+      {/* Navigation */}
+      <nav className="fixed top-0 w-full z-50 bg-white/70 backdrop-blur-md border-b border-border/50 px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <img src={logoImg} alt="PrivLink Logo" className="w-10 h-10 object-contain" />
+          <span className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-green-500 font-display">
+            PrivLink
+          </span>
+        </div>
+      </nav>
+
       {/* Hero Section */}
-      <div className="flex-1 flex flex-col items-center justify-center px-4 py-20 relative overflow-hidden">
+      <div className="flex-1 flex flex-col items-center justify-center px-4 py-20 mt-16 relative overflow-hidden">
         {/* Decorative background elements */}
         <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
           <div className="absolute top-20 left-10 w-64 h-64 bg-primary/5 rounded-full blur-3xl animate-float" />
@@ -24,9 +35,9 @@ export default function Home() {
           </div>
           
           <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-foreground font-display">
-            Share files, <br />
+            PrivLink: <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent">
-              leave no trace.
+              Secure & Private.
             </span>
           </h1>
         </div>
@@ -75,8 +86,12 @@ export default function Home() {
       </div>
       
       {/* Footer */}
-      <footer className="py-8 text-center text-sm text-muted-foreground">
-        <p>© {new Date().getFullYear()} TempShare. Built with privacy in mind.</p>
+      <footer className="py-8 text-center text-sm text-muted-foreground border-t border-border/50">
+        <div className="flex items-center justify-center gap-2 mb-2">
+          <img src={logoImg} alt="PrivLink Logo" className="w-6 h-6 object-contain opacity-50" />
+          <span className="font-bold opacity-50">PrivLink</span>
+        </div>
+        <p>© {new Date().getFullYear()} PrivLink. Built with privacy in mind.</p>
       </footer>
     </div>
   );

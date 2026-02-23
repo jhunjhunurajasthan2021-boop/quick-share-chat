@@ -84,7 +84,7 @@ export default function Share() {
             <ArrowLeft className="w-4 h-4" />
             Back to Home
           </Link>
-          <div className="text-xl font-bold font-display text-primary">TempShare</div>
+          <div className="text-xl font-bold font-display text-primary">PrivLink</div>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
