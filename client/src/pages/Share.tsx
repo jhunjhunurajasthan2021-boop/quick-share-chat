@@ -160,16 +160,30 @@ export default function Share() {
             </motion.div>
 
             {/* Safety Notice */}
-            <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-4 flex gap-3 items-start">
-              <div className="p-1 bg-blue-100 rounded-full text-blue-600 mt-0.5">
-                <ShieldIcon className="w-4 h-4" />
+            <div className="space-y-4">
+              <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-4 flex gap-3 items-start">
+                <div className="p-1 bg-blue-100 rounded-full text-blue-600 mt-0.5">
+                  <ShieldIcon className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-blue-900 text-sm">Security Notice</h4>
+                  <p className="text-blue-700/80 text-xs mt-1 leading-relaxed">
+                    This file is hosted temporarily. Ensure you trust the sender before downloading. 
+                    The file will be permanently deleted when the timer expires.
+                  </p>
+                </div>
               </div>
-              <div>
-                <h4 className="font-semibold text-blue-900 text-sm">Security Notice</h4>
-                <p className="text-blue-700/80 text-xs mt-1 leading-relaxed">
-                  This file is hosted temporarily. Ensure you trust the sender before downloading. 
-                  The file will be permanently deleted when the timer expires.
-                </p>
+              
+              <div className="bg-amber-50/50 border border-amber-100 rounded-xl p-4 flex gap-3 items-start">
+                <div className="p-1 bg-amber-100 rounded-full text-amber-600 mt-0.5">
+                  <AlertCircle className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-amber-900 text-sm">Legal Disclaimer</h4>
+                  <p className="text-amber-700/80 text-xs mt-1 leading-relaxed">
+                    User is responsible for uploaded content.
+                  </p>
+                </div>
               </div>
             </div>
           </div>

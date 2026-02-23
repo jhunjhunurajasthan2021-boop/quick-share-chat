@@ -91,6 +91,7 @@ export default function Home() {
           <img src={logoImg} alt="PrivLink Logo" className="w-6 h-6 object-contain opacity-50" />
           <span className="font-bold opacity-50">PrivLink</span>
         </div>
+        <p className="mb-2">User is responsible for uploaded content.</p>
         <p>© {new Date().getFullYear()} PrivLink. Built with privacy in mind.</p>
       </footer>
     </div>
