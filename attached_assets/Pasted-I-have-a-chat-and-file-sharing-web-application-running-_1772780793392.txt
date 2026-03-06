@@ -1,0 +1,92 @@
+I have a chat and file-sharing web application running on Replit. I want to implement an advanced admin monitoring and monthly reporting system.
+
+FEATURE REQUIREMENTS
+
+1. Activity Logging
+   The system must log the following information for every user action:
+
+* Chat messages (sender, receiver, message content)
+* Files shared (file name, file type, file size, download link)
+* Timestamp
+* User IP address
+* Device or platform (web, mobile, OS, browser if possible)
+* User ID or username
+
+2. Database Storage
+   Store all activity logs in a separate database table called:
+   activity_logs
+
+Suggested fields:
+
+* id
+* user_id
+* action_type (chat_message / file_upload / file_download)
+* message_content
+* file_name
+* file_type
+* file_size
+* receiver_id
+* ip_address
+* device_info
+* platform
+* timestamp
+
+3. Admin Dashboard
+   Create a secure admin dashboard with the following features:
+
+* View all chat logs
+* View all file sharing logs
+* Search logs by user
+* Filter logs by date
+* View IP addresses
+* Download logs manually (CSV/PDF)
+
+Only admin should have access to this dashboard.
+
+4. Monthly Automated Report
+   Create an automatic job that runs once every month and does the following:
+
+Step 1:
+Collect all activity logs from the last 30 days.
+
+Step 2:
+Generate a detailed report in CSV format containing:
+
+* chat messages
+* file sharing activity
+* IP address
+* device/platform
+* timestamps
+* users involved
+
+Step 3:
+Send the report automatically to this email address:
+[manishsaini.p1@gmail.com](mailto:manishsaini.p1@gmail.com)
+
+5. Google Drive Backup
+   Before deleting data, the system must upload the report file to Google Drive for backup.
+
+6. Automatic Data Cleanup
+   After:
+
+* Email is sent successfully
+  AND
+* Google Drive backup is completed
+
+Then delete the previous month's logs from the activity_logs table.
+
+7. Scheduler
+   Use a cron job or background worker to run this process automatically on the 1st day of every month.
+
+8. Security
+
+* Protect admin dashboard with authentication
+* Secure file access
+* Prevent unauthorized access to logs
+
+9. Logging and Error Handling
+   If email sending or Google Drive upload fails, the data should NOT be deleted and the error should be logged.
+
+10. Do not interrupt normal chat or file sharing operations.
+
+Please implement the backend logic, database schema, scheduler, admin dashboard, and reporting system.
