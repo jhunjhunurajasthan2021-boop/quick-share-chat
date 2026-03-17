@@ -10,7 +10,7 @@ import axios from "axios";
 import FormData from "form-data";
 import { addHours } from "date-fns";
 import { eq } from "drizzle-orm";
-import { db } from "./db";
+import { db, withRetry } from "./db";
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -152,11 +152,11 @@ export async function registerRoutes(
 
     socket.on("join", async ({ publicId, senderName }) => {
       console.log(`Join request for room: ${publicId} from ${senderName}`);
-      const file = await storage.getFileByPublicId(publicId);
+      const file = await withRetry(() => storage.getFileByPublicId(publicId));
       if (file) {
         socket.join(publicId);
         console.log(`Socket ${socket.id} joined room ${publicId}`);
-        const history = await storage.getMessages(file.id);
+        const history = await withRetry(() => storage.getMessages(file.id));
         socket.emit("history", history);
       } else {
         console.log(`Room ${publicId} not found for join`);
@@ -166,13 +166,13 @@ export async function registerRoutes(
 
     socket.on("message", async ({ publicId, content, senderName }) => {
       console.log(`Message in room ${publicId} from ${senderName}: ${content}`);
-      const file = await storage.getFileByPublicId(publicId);
+      const file = await withRetry(() => storage.getFileByPublicId(publicId));
       if (file) {
-        const message = await storage.createMessage({
+        const message = await withRetry(() => storage.createMessage({
           fileId: file.id,
           senderName,
           content
-        });
+        }));
         console.log(`Broadcasting message to room ${publicId}`);
         io.to(publicId).emit("message", message);
 
@@ -208,19 +208,21 @@ export async function registerRoutes(
       console.log(`Storing upload: ${req.file.originalname} (${req.file.size} bytes)`);
       
       const expiresAt = addHours(new Date(), 2);
-      const file = await storage.createFile({
-        filename: req.file.originalname,
-        mimeType: req.file.mimetype,
-        size: req.file.size,
+      const file = await withRetry(() => storage.createFile({
+        filename: req.file!.originalname,
+        mimeType: req.file!.mimetype,
+        size: req.file!.size,
         fileIoLink: "pending", 
         fileIoKey: "local-key",
         expiresAt,
-      });
+      }));
 
-      const [updatedFile] = await db.update(files)
-        .set({ fileIoLink: `/api/download/${file.publicId}` })
-        .where(eq(files.id, file.id))
-        .returning();
+      const [updatedFile] = await withRetry(() =>
+        db.update(files)
+          .set({ fileIoLink: `/api/download/${file.publicId}` })
+          .where(eq(files.id, file.id))
+          .returning()
+      );
       
       (storage as any).fileBuffers = (storage as any).fileBuffers || new Map();
       (storage as any).fileBuffers.set(updatedFile.publicId, req.file.buffer);
@@ -247,7 +249,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/download/:publicId", async (req, res) => {
-    const file = await storage.getFileByPublicId(req.params.publicId);
+    const file = await withRetry(() => storage.getFileByPublicId(req.params.publicId));
     if (!file) return res.status(404).send("Not found");
     
     const buffer = (storage as any).fileBuffers?.get(req.params.publicId);
