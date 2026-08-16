@@ -16,9 +16,31 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 // === Pairing System (In-Memory) ===
 const pairingCodes = new Map<string, { socketId: string; expires: number }>();
+type DeviceSession = {
+  name: string;
+  deviceType: "Mobile" | "Computer" | "Tablet" | "Unknown";
+  discoverable: boolean;
+};
+type ConnectionRequest = {
+  fromSocketId: string;
+  toSocketId: string;
+  expires: number;
+};
+const deviceSessions = new Map<string, DeviceSession>();
+const connectionRequests = new Map<string, ConnectionRequest>();
 
 function generatePairingCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+function getNearbyDevices() {
+  return Array.from(deviceSessions.entries())
+    .filter(([, device]) => device.discoverable)
+    .map(([id, device]) => ({
+      id,
+      name: device.name,
+      deviceType: device.deviceType,
+    }));
 }
 
 // === Admin Auth Middleware ===
@@ -83,6 +105,95 @@ export async function registerRoutes(
     console.log("New client connected", socket.id);
 
     // --- Pairing Logic ---
+    const broadcastNearbyDevices = () => {
+      const devices = getNearbyDevices();
+      for (const client of Array.from(io.sockets.sockets.values())) {
+        client.emit("nearby-devices", {
+          devices: devices.filter((device) => device.id !== client.id),
+        });
+      }
+    };
+
+    socket.on("register-device", ({ name, deviceType, discoverable = true }) => {
+      const validDeviceTypes = ["Mobile", "Computer", "Tablet", "Unknown"] as const;
+      const normalizedType = validDeviceTypes.includes(deviceType) ? deviceType : "Unknown";
+      deviceSessions.set(socket.id, {
+        name: typeof name === "string" && name.trim() ? name.trim().slice(0, 40) : "PrivLink device",
+        deviceType: normalizedType,
+        discoverable: discoverable !== false,
+      });
+      broadcastNearbyDevices();
+    });
+
+    socket.on("set-device-discoverable", ({ discoverable }) => {
+      const device = deviceSessions.get(socket.id);
+      if (device) {
+        device.discoverable = discoverable === true;
+        broadcastNearbyDevices();
+      }
+    });
+
+    socket.on("request-connection", ({ targetId }) => {
+      const target = deviceSessions.get(targetId);
+      const requester = deviceSessions.get(socket.id);
+
+      if (!requester || !target || !target.discoverable || targetId === socket.id) {
+        return socket.emit("connection-request-error", {
+          message: "That device is no longer available.",
+        });
+      }
+
+      const requestId = `${socket.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      connectionRequests.set(requestId, {
+        fromSocketId: socket.id,
+        toSocketId: targetId,
+        expires: Date.now() + 60 * 1000,
+      });
+
+      socket.emit("connection-request-sent", {
+        requestId,
+        targetName: target.name,
+      });
+      io.to(targetId).emit("connection-request", {
+        requestId,
+        from: {
+          id: socket.id,
+          name: requester.name,
+          deviceType: requester.deviceType,
+        },
+      });
+
+      setTimeout(() => {
+        if (connectionRequests.delete(requestId)) {
+          io.to(socket.id).emit("connection-request-expired");
+        }
+      }, 60 * 1000);
+    });
+
+    socket.on("respond-connection-request", ({ requestId, accepted }) => {
+      const request = connectionRequests.get(requestId);
+      if (!request || request.toSocketId !== socket.id || request.expires < Date.now()) {
+        connectionRequests.delete(requestId);
+        return socket.emit("connection-request-error", {
+          message: "This connection request has expired.",
+        });
+      }
+
+      connectionRequests.delete(requestId);
+      const requester = io.sockets.sockets.get(request.fromSocketId);
+      if (!accepted || !requester) {
+        io.to(request.fromSocketId).emit("connection-request-denied");
+        return;
+      }
+
+      const roomId = `nearby-${requestId}`;
+      requester.join(roomId);
+      socket.join(roomId);
+      io.to(roomId).emit("paired", { roomId });
+      io.to(request.fromSocketId).emit("connection-request-accepted");
+      console.log(`Nearby connection approved for room ${roomId}`);
+    });
+
     socket.on("generate-code", () => {
       const code = generatePairingCode();
       const expires = Date.now() + 10 * 60 * 1000;
@@ -193,6 +304,14 @@ export async function registerRoutes(
     });
 
     socket.on("disconnect", (reason) => {
+      deviceSessions.delete(socket.id);
+      for (const [requestId, request] of Array.from(connectionRequests.entries())) {
+        if (request.fromSocketId === socket.id || request.toSocketId === socket.id) {
+          connectionRequests.delete(requestId);
+          io.to(request.fromSocketId).emit("connection-request-expired");
+        }
+      }
+      broadcastNearbyDevices();
       console.log("Client disconnected", socket.id, reason);
     });
   });
