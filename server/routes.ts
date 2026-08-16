@@ -233,7 +233,7 @@ export async function registerRoutes(
 
       const roomId = `pair-${code}`;
       
-      for (const clientId of clients) {
+      for (const clientId of Array.from(clients)) {
         const clientSocket = io.sockets.sockets.get(clientId);
         if (clientSocket) {
           clientSocket.leave(pendingRoom);
@@ -414,7 +414,8 @@ export async function registerRoutes(
   });
 
   app.get(api.files.getByPublicId.path, async (req, res) => {
-    const file = await storage.getFileByPublicId(req.params.publicId);
+    const publicId = Array.isArray(req.params.publicId) ? req.params.publicId[0] : req.params.publicId;
+    const file = await storage.getFileByPublicId(publicId);
     if (!file) {
       return res.status(404).json({ message: 'File not found' });
     }
